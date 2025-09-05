@@ -8,3 +8,6 @@ doc
 vector_db
 *.pyc
 unused
+
+# Python
+__pycache__/
