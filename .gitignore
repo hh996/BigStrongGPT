@@ -1,0 +1,10 @@
+.idea
+applications/files/*
+*.json
+*.jsonl
+*.log
+*.pth
+doc
+vector_db
+*.pyc
+unused
