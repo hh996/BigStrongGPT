@@ -1,5 +1,7 @@
 cd BigStrongGPT\scripts
+
 $env:PYTHONPATH = (Get-Item ..).FullName
+
 streamlit run web_demo.py
 
 1、tokenizer
