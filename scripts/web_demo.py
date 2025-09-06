@@ -4,7 +4,7 @@ import torch
 from transformers import TextIteratorStreamer, AutoTokenizer
 
 # 自定义模型导入
-from model.model_big_strong import BigStrongForCausalLM, BigStrongConfig
+from model.model_big_strong import BigStrongForCausalLLM, BigStrongConfig
 
 # RAG 相关库
 import os
@@ -43,7 +43,7 @@ def load_model():
         eos_token_id=eos_id if eos_id is not None else 2,
         vocab_size=vocab_size,
     )
-    model = BigStrongForCausalLM(config)
+    model = BigStrongForCausalLLM(config)
 
     state_dict = torch.load(MODEL_PATH, map_location="cpu")
     model.load_state_dict(state_dict, strict=False)

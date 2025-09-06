@@ -322,7 +322,7 @@ class BigStrongModel(nn.Module):
         return hidden_states, presents
 
 
-class BigStrongForCausalLM(PreTrainedModel, GenerationMixin):
+class BigStrongForCausalLLM(PreTrainedModel, GenerationMixin):
     config_class = BigStrongConfig
 
     def __init__(self, config: BigStrongConfig = None):
