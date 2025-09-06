@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import swanlab
 
-from model.model_big_strong import BigStrongForCausalLM, BigStrongConfig
+from model.model_big_strong import BigStrongForCausalLLM, BigStrongConfig
 
 import argparse
 import time
@@ -110,7 +110,7 @@ def train_epoch(epoch):
 
 def init_model(lm_config):
     tokenizer = AutoTokenizer.from_pretrained("../model/")
-    model = BigStrongForCausalLM(lm_config)
+    model = BigStrongForCausalLLM(lm_config)
     ckp = f"../output/sft_output/full_sft_512.pth"
     state_dict = torch.load(ckp, map_location=args.device)
     model.load_state_dict(state_dict, strict=False)

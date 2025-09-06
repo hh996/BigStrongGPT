@@ -17,7 +17,7 @@ from contextlib import nullcontext
 from torch import optim, nn
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
-from model.model_big_strong import BigStrongConfig, BigStrongForCausalLM
+from model.model_big_strong import BigStrongConfig, BigStrongForCausalLLM
 from dataset.lm_dataset import SFTDataset
 
 warnings.filterwarnings("ignore")
@@ -111,7 +111,7 @@ def train_epoch(epoch):
 
 def init_model(lm_config):
     tokenizer = AutoTokenizer.from_pretrained("../model")
-    model = BigStrongForCausalLM(lm_config)
+    model = BigStrongForCausalLLM(lm_config)
     ckp = f"../output/pretrain_output/pretrain_512.pth"
     state_dict = torch.load(ckp, map_location=args.device)
     model.load_state_dict(state_dict, strict=False)

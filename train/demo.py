@@ -2,7 +2,7 @@ from contextlib import nullcontext
 import torch
 from transformers import AutoTokenizer
 
-from model.model_big_strong import BigStrongConfig, BigStrongForCausalLM
+from model.model_big_strong import BigStrongConfig, BigStrongForCausalLLM
 
 
 class TextGenerator:
@@ -53,7 +53,7 @@ class TextGenerator:
         checkpoint_dict = torch.load(
             self.checkpoint, map_location=self.device
         )  # 加载模型参数 # 初始化模型参数
-        self.model = BigStrongForCausalLM(
+        self.model = BigStrongForCausalLLM(
             BigStrongConfig(dim=1024, n_layers=18)
         )  # 实例化 Transformer 模型
         sunwanted_prefix = "_orig_mod."

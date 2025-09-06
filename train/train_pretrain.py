@@ -17,7 +17,7 @@ from torch import optim, nn
 from torch.utils.data import DataLoader
 from contextlib import nullcontext
 from transformers import AutoTokenizer
-from model.model_big_strong import BigStrongConfig, BigStrongForCausalLM
+from model.model_big_strong import BigStrongConfig, BigStrongForCausalLLM
 from dataset.lm_dataset import PretrainDataset
 
 
@@ -112,7 +112,7 @@ def train_epoch(epoch):
 
 def init_model(lm_config):
     tokenizer = AutoTokenizer.from_pretrained("../model/")
-    model = BigStrongForCausalLM(lm_config).to(args.device)
+    model = BigStrongForCausalLLM(lm_config).to(args.device)
     logger.debug(
         f"LLM可训练总参数量：{sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f} 百万"
     )
