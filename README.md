@@ -224,4 +224,4 @@ streamlit run web_demo.py
 
 ## 🎉效果展示
 
-![](演示截图.png)
+![](demo_show.png)
