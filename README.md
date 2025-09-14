@@ -224,4 +224,4 @@ streamlit run web_demo.py
 
 ## 🎉效果展示
 
-![](demo_show.png)
+![](https://github.com/hh996/BigStrongGPT/blob/main/demo_show.png)
