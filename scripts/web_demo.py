@@ -204,7 +204,6 @@ def initialize_rag(
         st.warning("⚠️ 未在文件夹中找到支持的文档（.txt/.pdf/.docx）")
         return None, None, None
 
-    progress_bar = st.progress(0)
     status_text = st.empty()
 
     for i, file_name in enumerate(files_to_process):
@@ -218,9 +217,6 @@ def initialize_rag(
             chunks_with_source = [f"[来源: {file_name}]\n{chunk}" for chunk in chunks]
             documents.extend(chunks_with_source)
 
-        progress_bar.progress((i + 1) / len(files_to_process))
-
-    progress_bar.empty()
     status_text.empty()
 
     if len(documents) == 0:

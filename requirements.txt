@@ -1,0 +1,13 @@
+torch>=2.0.0
+torchvision
+torchaudio
+transformers>=4.30.0
+streamlit>=1.28.0
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.4
+swanlab>=0.3.0
+PyMuPDF>=1.23.0
+python-docx>=0.8.11
+numpy>=1.24.0
+pandas>=2.0.0
+tqdm>=4.65.0

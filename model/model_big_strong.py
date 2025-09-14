@@ -2,7 +2,7 @@ from transformers import PretrainedConfig
 
 
 class BigStrongConfig(PretrainedConfig):
-    model_type = "minimind"
+    model_type = "BigStrong"
 
     def __init__(
         self,
