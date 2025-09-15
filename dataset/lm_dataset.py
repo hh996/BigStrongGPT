@@ -113,8 +113,6 @@ class SFTDataset(Dataset):
 
         return X, Y, loss_mask
 
-
-class DPODataset(Dataset):
     def __init__(self, file_path, tokenizer, max_length=4096):
         super().__init__()
         self.tokenizer = tokenizer
@@ -200,9 +198,6 @@ class DPODataset(Dataset):
             else:
                 i += 1
         return loss_mask
-
-
-class RLAIFDataset(Dataset):
     def __init__(self, jsonl_path, tokenizer, max_length=1024):
         super().__init__()
         self.tokenizer = tokenizer
