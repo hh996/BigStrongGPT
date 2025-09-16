@@ -105,7 +105,6 @@ streamlit run web_demo.py
 
 ### BigStrongConfig
 
-- **模型类型**: MiniMind架构
 - **隐藏层维度**: 512
 - **层数**: 8层
 - **注意力头数**: 8
