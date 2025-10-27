@@ -204,6 +204,7 @@ if __name__ == "__main__":
     lora_params_count = sum(
         p.numel() for name, p in model.named_parameters() if "lora" in name
     )  # LoRA 参数数量
+    logger.debug(f"LoRA总参数量：{lora_params_count / 1e4:.3f} 万")
 
     for name, param in model.named_parameters():
         if "lora" not in name:
