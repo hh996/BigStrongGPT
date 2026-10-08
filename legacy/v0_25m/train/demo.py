@@ -1,6 +1,16 @@
+import os
+import sys
 from contextlib import nullcontext
+
 import torch
 from transformers import AutoTokenizer
+
+_V0_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _V0_ROOT not in sys.path:
+    sys.path.insert(0, _V0_ROOT)
+from path_setup import LEGACY_ROOT, legacy_output, setup_import_paths  # noqa: E402
+
+setup_import_paths()
 
 from model.model_big_strong import BigStrongConfig, BigStrongForCausalLLM
 
@@ -9,7 +19,7 @@ class TextGenerator:
     def __init__(
         self,
         checkpoint: str,  # 模型检查点路径
-        tokenizer_model_path="../model/",  # 分词器模型路径
+        tokenizer_model_path=str(LEGACY_ROOT / "model"),  # 分词器模型路径
         seed=42,  # 随机种子，确保可重复性
         device=None,  # 设备，优先使用 CUDA，如果没有可用的 CUDA，则使用 CPU
     ):  
@@ -146,7 +156,9 @@ if __name__ == "__main__":
         "阿里巴巴",
     ]
 
-    generator = TextGenerator(checkpoint="../output/pretrain_output/pretrain_512.pth")
+    generator = TextGenerator(
+        checkpoint=legacy_output("pretrain_output", "pretrain_512.pth")
+    )
     for i in range(len(pretrain_prompt_datas)):
         samples = generator.generate_samples(
             start=pretrain_prompt_datas[i],  # 自定义起始文本
@@ -162,7 +174,9 @@ if __name__ == "__main__":
         '你好',
         "阿里巴巴",
     ]
-    generator = TextGenerator(checkpoint='../output/sft_output/full_sft_512.pth')  # 初始化生成器
+    generator = TextGenerator(
+        checkpoint=legacy_output("sft_output", "full_sft_512.pth")
+    )
     for i in range(len(sft_prompt_datas)):
         samples = generator.generate_samples(
             start=sft_prompt_datas[i],  # 自定义起始文本
@@ -178,7 +192,7 @@ if __name__ == "__main__":
         '你好',
         "阿里巴巴",
     ]
-    generator = TextGenerator(checkpoint='../output/lora_output/lora_512.pth')  # 初始化生成器
+    generator = TextGenerator(checkpoint=legacy_output("lora_output", "lora_512.pth"))
     for i in range(len(lora_prompt_datas)):
         samples = generator.generate_samples(
             start=lora_prompt_datas[i],  # 自定义起始文本

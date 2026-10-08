@@ -14,31 +14,24 @@
 
 ```
 BigStrongGPT/
-├── model/                    # 模型相关文件
-│   ├── model_big_strong.py   # 主模型架构
-│   ├── model_lora.py         # LoRA微调实现
-│   ├── tokenizer.json        # 分词器配置
-│   └── *.pth                 # 预训练模型权重
-├── dataset/                  # 数据集
-│   ├── lm_dataset.py         # 数据集处理类
-│   ├── pretrain_hq.jsonl     # 预训练数据
-│   ├── sft_*.jsonl          # 微调数据
-│   └── lora_*.jsonl         # LoRA微调数据
-├── train/                    # 训练脚本
-│   ├── train_pretrain.py     # 预训练脚本
-│   ├── train_full_sft.py     # 全参数微调脚本
-│   └── train_lora.py         # LoRA微调脚本
-├── scripts/                  # 工具脚本
-│   ├── web_demo.py          # Web演示界面
-│   └── train_tokenizer.py   # 分词器训练
-├── output/                   # 训练输出
-│   ├── pretrain_output/      # 预训练输出
-│   ├── sft_output/          # 微调输出
-│   └── lora_output/         # LoRA输出
-├── doc/                      # 文档存储（用于RAG）
-├── vector_db/               # 向量数据库（RAG）
-└── unused/                  # 未使用的实验代码
+├── docs/                     # 路线图、数据来源（共用）
+├── dataset/                  # 训练数据 + lm_dataset.py（共用，*.jsonl 本地生成）
+├── scripts/
+│   └── download_datasets.py  # 数据下载（仓库级）
+├── legacy/v0_25m/            # 25M 可运行老版本
+│   ├── model/                # 架构、分词器、权重
+│   ├── train/                # Pretrain / SFT / LoRA
+│   ├── scripts/              # web_demo、train_tokenizer
+│   └── output/               # 老版训练产出（本地）
+├── src/                      # v1 重构（150~250M，开发中）
+│   └── bigstrong/
+├── doc/                      # RAG 文档（仓库根）
+├── vector_db/                # RAG 向量库
+└── 笔记.md
 ```
+
+- **Legacy**：见 [legacy/v0_25m/README.md](legacy/v0_25m/README.md)
+- **新版**：见 [src/README.md](src/README.md) 与 [docs/TRAINING_ROADMAP.md](docs/TRAINING_ROADMAP.md)
 
 ## 💰训练成本
 
@@ -73,31 +66,27 @@ pip install python-docx  # Word文档处理
 
 ## 🎯 使用方法
 
-### 1. 预训练
+### 1. 下载数据（仓库根）
 
 ```bash
-cd train
-python train_pretrain.py --data_path ../dataset/pretrain_hq.jsonl --epochs 1 --batch_size 32
+python scripts/download_datasets.py --all
 ```
 
-### 2. 全参数微调
+### 2. Legacy 25M 训练
 
 ```bash
-cd train
-python train_full_sft.py --data_path ../dataset/sft_mini_512.jsonl --epochs 2 --batch_size 16
+cd legacy/v0_25m/train
+python train_pretrain.py
+python train_full_sft.py
+python train_lora.py
 ```
 
-### 3. LoRA微调
+默认数据路径指向仓库根 `dataset/`（如 `pretrain_wikipedia.jsonl`、`sft_merged.jsonl`）。
+
+### 3. Web 演示（Legacy）
 
 ```bash
-cd train
-python train_lora.py --data_path ../dataset/lora_medical.jsonl --epochs 10 --batch_size 32
-```
-
-### 4. Web演示
-
-```bash
-cd scripts
+cd legacy/v0_25m/scripts
 streamlit run web_demo.py
 ```
 
@@ -201,23 +190,17 @@ pip install -r requirements.txt
 3. **准备数据**
 将训练数据放入 `dataset/` 目录
 
-4. **开始训练**
+4. **开始训练（Legacy 25M）**
 ```bash
-# 预训练
-python train/train_pretrain.py
-
-# 微调
-python train/train_full_sft.py
-
-# LoRA微调
-python train/train_lora.py
+cd legacy/v0_25m/train
+python train_pretrain.py
+python train_full_sft.py
+python train_lora.py
 ```
 
-5. **启动Web界面**
+5. **启动 Web 界面（Legacy）**
 ```bash
-# Windows PowerShell
-cd BigStrongGPT\scripts
-$env:PYTHONPATH = (Get-Item ..).FullName
+cd legacy\v0_25m\scripts
 streamlit run web_demo.py
 ```
 

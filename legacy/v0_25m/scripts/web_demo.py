@@ -1,3 +1,13 @@
+import os
+import sys
+
+_V0_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _V0_ROOT not in sys.path:
+    sys.path.insert(0, _V0_ROOT)
+from path_setup import LEGACY_ROOT, REPO_ROOT, setup_import_paths  # noqa: E402
+
+setup_import_paths()
+
 import streamlit as st
 from threading import Thread
 import torch
@@ -7,7 +17,6 @@ from transformers import TextIteratorStreamer, AutoTokenizer
 from model.model_big_strong import BigStrongForCausalLLM, BigStrongConfig
 
 # RAG 相关库
-import os
 import fitz
 from docx import Document
 from sentence_transformers import SentenceTransformer
@@ -18,11 +27,11 @@ import hashlib
 from datetime import datetime
 
 # 全局变量
-MODEL_PATH = "../model/full_sft_512.pth"
-TOKENIZER_PATH = "../model"
+MODEL_PATH = str(LEGACY_ROOT / "model" / "full_sft_512.pth")
+TOKENIZER_PATH = str(LEGACY_ROOT / "model")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-DOCUMENT_FOLDER = "../doc"  # 文档路径
-VECTOR_DB_FOLDER = "../vector_db"  # 向量数据库存储路径
+DOCUMENT_FOLDER = str(REPO_ROOT / "doc")  # 文档路径（仓库根）
+VECTOR_DB_FOLDER = str(REPO_ROOT / "vector_db")  # 向量数据库（仓库根）
 
 
 @st.cache_resource

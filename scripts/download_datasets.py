@@ -57,7 +57,11 @@ def sample_rows(rows: list[dict], max_samples: int | None, seed: int = 42) -> li
 def download_pretrain_wikipedia(max_samples: int | None = 100_000) -> Path:
     """Wikipedia 中文，适合本地调试。"""
     print("\n[Pretrain] Wikipedia 中文...")
-    ds = load_hf_dataset("wikipedia", "20231101.zh")
+    try:
+        ds = load_hf_dataset("wikimedia/wikipedia", "20231101.zh")
+    except Exception:
+        # 兼容旧版 datasets 的加载方式
+        ds = load_hf_dataset("wikipedia", "20231101.zh")
     rows = []
     for item in tqdm(ds, desc="  转换"):
         text = (item.get("text") or "").strip()
@@ -201,7 +205,7 @@ def merge_sft_files(out_name: str = "sft_merged.jsonl") -> Path:
 
 def download_dpo_shibing(max_samples: int | None = 5_000) -> Path:
     print("\n[DPO] shibing624/DPO-En-Zh-20k-Preference (中文部分) ...")
-    ds = load_hf_dataset("shibing624/DPO-En-Zh-20k-Preference")
+    ds = load_hf_dataset("shibing624/DPO-En-Zh-20k-Preference", "zh")
     rows = []
     for item in tqdm(ds, desc="  转换"):
         # 优先中文字段；该数据集含 system/history/question
@@ -358,9 +362,10 @@ def main():
 
     print("\n完成！请查看 dataset/ 目录。")
     print("训练示例:")
-    print("  python train/train_pretrain.py --data_path ../dataset/pretrain_wikipedia.jsonl")
-    print("  python train/train_full_sft.py --data_path ../dataset/sft_merged.jsonl")
-    print("  python train/train_lora.py --data_path ../dataset/lora_medical.jsonl")
+    print("  cd legacy/v0_25m/train")
+    print("  python train_pretrain.py")
+    print("  python train_full_sft.py")
+    print("  python train_lora.py")
 
 
 if __name__ == "__main__":

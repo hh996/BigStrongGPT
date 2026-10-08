@@ -4,24 +4,32 @@ import sys
 
 __package__ = "trainer"
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+_V0_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _V0_ROOT not in sys.path:
+    sys.path.insert(0, _V0_ROOT)
+from path_setup import (  # noqa: E402
+    LEGACY_ROOT,
+    legacy_output,
+    load_repo_dotenv,
+    repo_dataset,
+    setup_import_paths,
+)
+
+setup_import_paths()
 
 import swanlab
-from dotenv import load_dotenv
-
-from model.model_big_strong import BigStrongForCausalLLM, BigStrongConfig
 
 import argparse
 import time
 import math
 import warnings
 import torch
-from torch import optim, nn
 from contextlib import nullcontext
+from torch import optim, nn
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
+from model.model_big_strong import BigStrongConfig, BigStrongForCausalLLM
 from dataset.lm_dataset import SFTDataset
-from model.model_lora import save_lora, apply_lora
 
 warnings.filterwarnings("ignore")
 
@@ -30,7 +38,6 @@ def get_lr(current_step, total_steps, lr):
     return lr / 10 + 0.5 * lr * (1 + math.cos(math.pi * current_step / total_steps))
 
 
-# 代码和full_sft「几乎」一致
 def train_epoch(epoch):
     loss_fct = nn.CrossEntropyLoss(reduction="none")
     start_time = time.time()
@@ -38,6 +45,7 @@ def train_epoch(epoch):
         X = X.to(args.device)
         Y = Y.to(args.device)
         loss_mask = loss_mask.to(args.device)
+
         lr = get_lr(
             epoch * iter_per_epoch + step,
             args.epochs * iter_per_epoch,
@@ -56,15 +64,17 @@ def train_epoch(epoch):
 
         scaler.scale(loss).backward()
 
+        # 每accumulation_steps步执行一次优化器更新
         if (step + 1) % args.accumulation_steps == 0:
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(lora_params, args.grad_clip)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
 
             scaler.step(optimizer)
             scaler.update()
 
             optimizer.zero_grad(set_to_none=True)
 
+        # 每log_interval步记录一次日志
         if step % args.log_interval == 0:
             spend_time = time.time() - start_time
             # 计算已用时间和预估剩余时间
@@ -99,58 +109,57 @@ def train_epoch(epoch):
                 }
             )
 
+        # 每save_interval步保存一次模型
         if (step + 1) % args.save_interval == 0:
             model.eval()
-            ckp = f"{args.save_dir}/lora_{lm_config.hidden_size}.pth"
+            ckp = f"{args.save_dir}/full_sft_{lm_config.hidden_size}.pth"
+            state_dict = model.state_dict()
 
-            os.makedirs(os.path.dirname(ckp), exist_ok=True)
-            # 【区别1】只保存lora权重即可
-            save_lora(model, ckp)
+            state_dict = {k: v.half() for k, v in state_dict.items()}  # 半精度保存
+            torch.save(state_dict, ckp)
             model.train()
 
 
 def init_model(lm_config):
-    tokenizer = AutoTokenizer.from_pretrained("../model/")
+    tokenizer = AutoTokenizer.from_pretrained(str(LEGACY_ROOT / "model"))
     model = BigStrongForCausalLLM(lm_config)
-    ckp = f"../output/sft_output/full_sft_512.pth"
+    ckp = legacy_output("pretrain_output", "pretrain_512.pth")
     state_dict = torch.load(ckp, map_location=args.device)
     model.load_state_dict(state_dict, strict=False)
+
     logger.debug(
-        f"LLM总参数量：{sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f} 百万"
+        f"LLM可训练总参数量：{sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f} 百万"
     )
-    return model.to(args.device), tokenizer
+    model = model.to(args.device)
+    return model, tokenizer
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="BigStrongGPT SFT with LoRA")
-    parser.add_argument("--out_dir", type=str, default="../output/lora_output/")
+    parser = argparse.ArgumentParser(description="BigStrongGPT Full SFT")
+    parser.add_argument(
+        "--out_dir", type=str, default=legacy_output("sft_output") + os.sep
+    )
     parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--learning_rate", type=float, default=1e-4)
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--learning_rate", type=float, default=5e-7)
     parser.add_argument(
         "--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu"
     )
     parser.add_argument("--dtype", type=str, default="bfloat16")
     parser.add_argument("--num_workers", type=int, default=1)
-    parser.add_argument("--ddp", action="store_true")
     parser.add_argument("--accumulation_steps", type=int, default=1)
     parser.add_argument("--grad_clip", type=float, default=1.0)
     parser.add_argument("--warmup_iters", type=int, default=0)
     parser.add_argument("--log_interval", type=int, default=100)
-    parser.add_argument("--save_interval", type=int, default=100)
+    parser.add_argument("--save_interval", type=int, default=5000)
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--hidden_size", default=512, type=int)
     parser.add_argument("--num_hidden_layers", default=8, type=int)
     parser.add_argument("--max_seq_len", default=512, type=int)
     parser.add_argument(
-        "--data_path", type=str, default="../dataset/lora_medical.jsonl"
+        "--data_path", type=str, default=repo_dataset("sft_merged.jsonl")
     )
-    parser.add_argument(
-        "--lora_name",
-        type=str,
-        default="lora_medical",
-        help="根据任务保存成lora_(英文/医学/心理...)",
-    )
+
     args = parser.parse_args()
 
     # 日志模块
@@ -160,7 +169,7 @@ if __name__ == "__main__":
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.DEBUG)  # 控制台输出INFO及以上级别
 
-    file_handler = logging.FileHandler("../output/lora_output/lora.log")
+    file_handler = logging.FileHandler(legacy_output("sft_output", "sft.log"))
     file_handler.setLevel(logging.DEBUG)  # 文件保存DEBUG及以上级别
 
     formatter = logging.Formatter(
@@ -184,11 +193,11 @@ if __name__ == "__main__":
 
     # ==================== 实验跟踪初始化 ====================
     # 加载swanlab key
-    load_dotenv()
+    load_repo_dotenv()
     swanlab.login(api_key=os.getenv("SWANLAB_API_KEY"))
     run = swanlab.init(
         project="BigStrongGPT",  # 项目名称
-        experiment_name="lora",  # 实验名称
+        experiment_name="full sft",  # 实验名称
         config=args,  # 保存所有超参数
     )
 
@@ -198,24 +207,7 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(base_seed)
 
     model, tokenizer = init_model(lm_config)
-    apply_lora(model)
 
-    total_params = sum(p.numel() for p in model.parameters())  # 总参数数量
-    lora_params_count = sum(
-        p.numel() for name, p in model.named_parameters() if "lora" in name
-    )  # LoRA 参数数量
-    logger.debug(f"LoRA总参数量：{lora_params_count / 1e4:.3f} 万")
-
-    for name, param in model.named_parameters():
-        if "lora" not in name:
-            param.requires_grad = False
-    lora_params = []
-    for name, param in model.named_parameters():
-        if "lora" in name:
-            lora_params.append(param)
-
-    # 只对 LoRA 参数进行优化
-    optimizer = optim.AdamW(lora_params, lr=args.learning_rate)
     train_ds = SFTDataset(args.data_path, tokenizer, max_length=args.max_seq_len)
     train_loader = DataLoader(
         train_ds,
@@ -227,7 +219,8 @@ if __name__ == "__main__":
     )
 
     scaler = torch.cuda.amp.GradScaler(enabled=True)
-    iter_per_epoch = len(train_loader)
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
 
+    iter_per_epoch = len(train_loader)
     for epoch in range(args.epochs):
         train_epoch(epoch)

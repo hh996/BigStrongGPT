@@ -4,11 +4,20 @@ import sys
 
 __package__ = "trainer"
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+_V0_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _V0_ROOT not in sys.path:
+    sys.path.insert(0, _V0_ROOT)
+from path_setup import (  # noqa: E402
+    LEGACY_ROOT,
+    legacy_output,
+    load_repo_dotenv,
+    repo_dataset,
+    setup_import_paths,
+)
+
+setup_import_paths()
 
 import swanlab
-import os
-from dotenv import load_dotenv
 
 import argparse
 import time
@@ -115,7 +124,7 @@ def train_epoch(epoch):
 
 
 def init_model(lm_config):
-    tokenizer = AutoTokenizer.from_pretrained("../model/")
+    tokenizer = AutoTokenizer.from_pretrained(str(LEGACY_ROOT / "model"))
     model = BigStrongForCausalLLM(lm_config).to(args.device)
     logger.debug(
         f"LLM可训练总参数量：{sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f} 百万"
@@ -125,7 +134,9 @@ def init_model(lm_config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="BigStrongGPT Pretrain")
-    parser.add_argument("--out_dir", type=str, default="../output/pretrain_output/")
+    parser.add_argument(
+        "--out_dir", type=str, default=legacy_output("pretrain_output") + os.sep
+    )
     # 若要以最快速度实现zero则epochs设置为1轮；否则应当利用有限的数据训练2~6个epochs。
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch_size", type=int, default=32)
@@ -143,7 +154,9 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_size", default=512, type=int)
     parser.add_argument("--num_hidden_layers", default=8, type=int)
     parser.add_argument("--max_seq_len", default=512, type=int)
-    parser.add_argument("--data_path", type=str, default="../dataset/pretrain_hq.jsonl")
+    parser.add_argument(
+        "--data_path", type=str, default=repo_dataset("pretrain_wikipedia.jsonl")
+    )
     args = parser.parse_args()
 
     # 日志模块
@@ -153,7 +166,7 @@ if __name__ == "__main__":
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.DEBUG)  # 控制台输出INFO及以上级别
 
-    file_handler = logging.FileHandler("../output/pretrain_output/pretrain.log")
+    file_handler = logging.FileHandler(legacy_output("pretrain_output", "pretrain.log"))
     file_handler.setLevel(logging.DEBUG)  # 文件保存DEBUG及以上级别
 
     formatter = logging.Formatter(
@@ -182,8 +195,8 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(base_seed)
 
     # ==================== 实验跟踪初始化 ====================
-    # 加载swanlab key
-    load_dotenv()
+    # 加载swanlab key（仓库根 .env）
+    load_repo_dotenv()
     swanlab.login(api_key=os.getenv("SWANLAB_API_KEY"))
     run = swanlab.init(
         project="BigStrongGPT",  # 项目名称

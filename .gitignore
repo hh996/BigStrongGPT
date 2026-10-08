@@ -8,6 +8,7 @@ doc
 vector_db
 *.pyc
 unused
+legacy/v0_25m/output/
 
 # Python
 __pycache__/
