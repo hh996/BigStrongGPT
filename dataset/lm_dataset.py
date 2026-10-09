@@ -116,5 +116,79 @@ class SFTDataset(Dataset):
 
         return X, Y, loss_mask
 
+
+class DPODataset(Dataset):
+    """DPO 偏好对：jsonl 每行含 prompt / chosen / rejected。"""
+
+    def __init__(self, jsonl_path, tokenizer, max_length=512, max_samples=None):
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        self.samples = self._load_data(jsonl_path, max_samples)
+        self.bos_id = tokenizer(
+            "<|im_start|>assistant", add_special_tokens=False
+        ).input_ids
+        self.eos_id = tokenizer("<|im_end|>", add_special_tokens=False).input_ids
+
+    def _load_data(self, path, max_samples):
+        samples = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                samples.append(json.loads(line.strip()))
+                if max_samples is not None and len(samples) >= max_samples:
+                    break
+        return samples
+
+    def __len__(self):
+        return len(self.samples)
+
+    def _assistant_loss_mask(self, input_ids):
+        loss_mask = [0] * len(input_ids)
+        i = 0
+        while i < len(input_ids):
+            if input_ids[i : i + len(self.bos_id)] == self.bos_id:
+                start = i + len(self.bos_id)
+                end = start
+                while end < len(input_ids):
+                    if input_ids[end : end + len(self.eos_id)] == self.eos_id:
+                        break
+                    end += 1
+                for j in range(
+                    start + 1, min(end + len(self.eos_id) + 1, self.max_length)
+                ):
+                    loss_mask[j] = 1
+                i = end + len(self.eos_id) if end < len(input_ids) else len(input_ids)
+            else:
+                i += 1
+        return loss_mask
+
+    def _tokenize_completion(self, prompt: str, response: str):
+        messages = [
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": response},
+        ]
+        text = self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=False
+        )
+        input_ids = self.tokenizer(text).input_ids[: self.max_length]
+        pad_id = self.tokenizer.pad_token_id
+        input_ids += [pad_id] * (self.max_length - len(input_ids))
+        loss_mask = self._assistant_loss_mask(input_ids)
+
+        x = torch.tensor(input_ids[:-1], dtype=torch.long)
+        y = torch.tensor(input_ids[1:], dtype=torch.long)
+        loss_mask = torch.tensor(loss_mask[1:], dtype=torch.long)
+        return x, y, loss_mask
+
+    def __getitem__(self, index):
+        row = self.samples[index]
+        prompt = row["prompt"]
+        c_x, c_y, c_mask = self._tokenize_completion(prompt, row["chosen"])
+        r_x, r_y, r_mask = self._tokenize_completion(prompt, row["rejected"])
+        return c_x, c_y, c_mask, r_x, r_y, r_mask
+
+
 if __name__ == "__main__":
     pass

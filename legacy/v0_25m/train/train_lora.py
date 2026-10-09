@@ -9,15 +9,14 @@ if _V0_ROOT not in sys.path:
     sys.path.insert(0, _V0_ROOT)
 from path_setup import (  # noqa: E402
     LEGACY_ROOT,
+    init_swanlab,
     legacy_output,
-    load_repo_dotenv,
+    log_swanlab,
     repo_dataset,
     setup_import_paths,
 )
 
 setup_import_paths()
-
-import swanlab
 
 from model.model_big_strong import BigStrongForCausalLLM, BigStrongConfig
 
@@ -102,7 +101,7 @@ def train_epoch(epoch):
             )
 
             # 启用SwanLab，记录训练指标
-            swanlab.log(
+            log_swanlab(
                 {
                     "loss": loss.item() * args.accumulation_steps,
                     "lr": optimizer.param_groups[-1]["lr"],
@@ -110,20 +109,24 @@ def train_epoch(epoch):
             )
 
         if (step + 1) % args.save_interval == 0:
-            model.eval()
-            ckp = f"{args.save_dir}/lora_{lm_config.hidden_size}.pth"
+            save_lora_checkpoint(model)
 
-            os.makedirs(os.path.dirname(ckp), exist_ok=True)
-            # 【区别1】只保存lora权重即可
-            save_lora(model, ckp)
-            model.train()
+    save_lora_checkpoint(model)
+    logger.debug(f"Epoch {epoch + 1} 结束，已保存 LoRA checkpoint")
 
 
-def init_model(lm_config):
+def save_lora_checkpoint(model):
+    model.eval()
+    ckp = f"{args.save_dir}/lora_{args.lora_name}_{lm_config.hidden_size}.pth"
+    os.makedirs(os.path.dirname(ckp), exist_ok=True)
+    save_lora(model, ckp)
+    model.train()
+
+
+def init_model(lm_config, base_ckpt):
     tokenizer = AutoTokenizer.from_pretrained(str(LEGACY_ROOT / "model"))
     model = BigStrongForCausalLLM(lm_config)
-    ckp = legacy_output("sft_output", "full_sft_512.pth")
-    state_dict = torch.load(ckp, map_location=args.device)
+    state_dict = torch.load(base_ckpt, map_location=args.device)
     model.load_state_dict(state_dict, strict=False)
     logger.debug(
         f"LLM总参数量：{sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f} 百万"
@@ -160,10 +163,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lora_name",
         type=str,
-        default="lora_medical",
-        help="根据任务保存成lora_(英文/医学/心理...)",
+        default="medical",
+        help="保存为 lora_{name}_512.pth",
+    )
+    _dpo = legacy_output("dpo_output", "dpo_512.pth")
+    _sft = legacy_output("sft_output", "full_sft_512.pth")
+    parser.add_argument(
+        "--base_ckpt",
+        type=str,
+        default=_dpo if os.path.isfile(_dpo) else _sft,
+        help="冻结底座权重（默认有 DPO 则用 DPO，否则 SFT）",
     )
     args = parser.parse_args()
+    os.makedirs(legacy_output("lora_output"), exist_ok=True)
 
     # 日志模块
     logger = logging.Logger("BigStrongGPT")
@@ -194,22 +206,15 @@ if __name__ == "__main__":
     tokens_per_iter = args.batch_size * args.max_seq_len
     device_type = "cuda" if "cuda" in args.device else "cpu"
 
-    # ==================== 实验跟踪初始化 ====================
-    # 加载swanlab key
-    load_repo_dotenv()
-    swanlab.login(api_key=os.getenv("SWANLAB_API_KEY"))
-    run = swanlab.init(
-        project="BigStrongGPT",  # 项目名称
-        experiment_name="lora",  # 实验名称
-        config=args,  # 保存所有超参数
-    )
+    init_swanlab(project="BigStrongGPT", experiment_name="lora", config=args)
 
-    ctx = nullcontext() if device_type == "cpu" else torch.cuda.amp.autocast()
+    ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast("cuda")
     base_seed = 1337
     torch.manual_seed(base_seed)
     torch.cuda.manual_seed(base_seed)
 
-    model, tokenizer = init_model(lm_config)
+    logger.debug(f"加载底座权重: {args.base_ckpt}")
+    model, tokenizer = init_model(lm_config, args.base_ckpt)
     apply_lora(model)
 
     total_params = sum(p.numel() for p in model.parameters())  # 总参数数量

@@ -9,15 +9,14 @@ if _V0_ROOT not in sys.path:
     sys.path.insert(0, _V0_ROOT)
 from path_setup import (  # noqa: E402
     LEGACY_ROOT,
+    init_swanlab,
     legacy_output,
-    load_repo_dotenv,
+    log_swanlab,
     repo_dataset,
     setup_import_paths,
 )
 
 setup_import_paths()
-
-import swanlab
 
 import argparse
 import time
@@ -102,7 +101,7 @@ def train_epoch(epoch):
             )
 
             # 启用SwanLab，记录训练指标
-            swanlab.log(
+            log_swanlab(
                 {
                     "loss": loss.item() * args.accumulation_steps,
                     "lr": optimizer.param_groups[-1]["lr"],
@@ -118,6 +117,13 @@ def train_epoch(epoch):
             state_dict = {k: v.half() for k, v in state_dict.items()}  # 半精度保存
             torch.save(state_dict, ckp)
             model.train()
+
+    model.eval()
+    ckp = f"{args.save_dir}/full_sft_{lm_config.hidden_size}.pth"
+    state_dict = {k: v.half() for k, v in model.state_dict().items()}
+    torch.save(state_dict, ckp)
+    model.train()
+    logger.debug(f"Epoch {epoch + 1} 结束，已保存 {ckp}")
 
 
 def init_model(lm_config):
@@ -161,6 +167,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    os.makedirs(legacy_output("sft_output"), exist_ok=True)
 
     # 日志模块
     logger = logging.Logger("BigStrongGPT")
@@ -191,17 +198,9 @@ if __name__ == "__main__":
     tokens_per_iter = args.batch_size * args.max_seq_len
     device_type = "cuda" if "cuda" in args.device else "cpu"
 
-    # ==================== 实验跟踪初始化 ====================
-    # 加载swanlab key
-    load_repo_dotenv()
-    swanlab.login(api_key=os.getenv("SWANLAB_API_KEY"))
-    run = swanlab.init(
-        project="BigStrongGPT",  # 项目名称
-        experiment_name="full sft",  # 实验名称
-        config=args,  # 保存所有超参数
-    )
+    init_swanlab(project="BigStrongGPT", experiment_name="full_sft", config=args)
 
-    ctx = nullcontext() if device_type == "cpu" else torch.cuda.amp.autocast()
+    ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast("cuda")
     base_seed = 1337
     torch.manual_seed(base_seed)
     torch.cuda.manual_seed(base_seed)

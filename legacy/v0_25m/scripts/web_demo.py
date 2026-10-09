@@ -4,7 +4,7 @@ import sys
 _V0_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _V0_ROOT not in sys.path:
     sys.path.insert(0, _V0_ROOT)
-from path_setup import LEGACY_ROOT, REPO_ROOT, setup_import_paths  # noqa: E402
+from path_setup import LEGACY_ROOT, REPO_ROOT, legacy_output, setup_import_paths  # noqa: E402
 
 setup_import_paths()
 
@@ -15,6 +15,7 @@ from transformers import TextIteratorStreamer, AutoTokenizer
 
 # 自定义模型导入
 from model.model_big_strong import BigStrongForCausalLLM, BigStrongConfig
+from model.model_lora import apply_lora, load_lora
 
 # RAG 相关库
 import fitz
@@ -26,8 +27,17 @@ import json
 import hashlib
 from datetime import datetime
 
-# 全局变量
-MODEL_PATH = str(LEGACY_ROOT / "model" / "full_sft_512.pth")
+# 全局变量：环境变量 BIGSTRONG_CKPT 优先；否则有 DPO 权重则用 DPO
+_dpo_ckpt = legacy_output("dpo_output", "dpo_512.pth")
+_sft_ckpt = legacy_output("sft_output", "full_sft_512.pth")
+MODEL_PATH = (
+    os.environ.get("BIGSTRONG_CKPT")
+    or (_dpo_ckpt if os.path.isfile(_dpo_ckpt) else _sft_ckpt)
+)
+_default_lora = legacy_output("lora_output", "lora_medical_512.pth")
+LORA_PATH = os.environ.get("BIGSTRONG_LORA") or (
+    _default_lora if os.path.isfile(_default_lora) else None
+)
 TOKENIZER_PATH = str(LEGACY_ROOT / "model")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DOCUMENT_FOLDER = str(REPO_ROOT / "doc")  # 文档路径（仓库根）
@@ -56,7 +66,11 @@ def load_model():
 
     state_dict = torch.load(MODEL_PATH, map_location="cpu")
     model.load_state_dict(state_dict, strict=False)
-    model = model.to(DEVICE).eval()
+    model = model.to(DEVICE)
+    if LORA_PATH:
+        apply_lora(model)
+        load_lora(model, LORA_PATH)
+    model = model.eval()
     # 设置生成配置，确保与 tokenizer 对齐
     try:
         model.generation_config.pad_token_id = (
@@ -76,7 +90,7 @@ def get_documents_hash(document_folder):
     """获取文件名和修改时间的哈希值来判断文档是否有变更"""
     hash_md5 = hashlib.md5()
 
-    if not os.path.exists(document_folder):
+    if not os.path.isdir(document_folder):
         return ""
 
     # 获取所有支持的文件
@@ -167,14 +181,22 @@ def load_vector_db(vector_db_folder, embedding_model_name):
 
 
 @st.cache_resource
+def load_embedding_model(model_name: str = "all-MiniLM-L6-v2"):
+    """首次运行会从 HuggingFace 下载模型，可能需数分钟。"""
+    return SentenceTransformer(model_name)
+
+
+@st.cache_resource
 def initialize_rag(
     document_folder=DOCUMENT_FOLDER,
     vector_db_folder=VECTOR_DB_FOLDER,
     force_rebuild=False,
 ):
-    # 中文 embedding 模型（名称实际是英文模型，但通用性强）
+    os.makedirs(document_folder, exist_ok=True)
+    os.makedirs(vector_db_folder, exist_ok=True)
+
     embedding_model_name = "all-MiniLM-L6-v2"
-    embedding_model = SentenceTransformer(embedding_model_name)
+    embedding_model = load_embedding_model(embedding_model_name)
 
     # 计算当前文档的哈希值
     current_docs_hash = get_documents_hash(document_folder)
@@ -202,9 +224,13 @@ def initialize_rag(
     supported_exts = {".txt", ".pdf", ".docx"}
 
     # 加载supported_exts类的文档
+    try:
+        names = os.listdir(document_folder)
+    except OSError:
+        names = []
     files_to_process = [
         f
-        for f in os.listdir(document_folder)
+        for f in names
         if os.path.isfile(os.path.join(document_folder, f))
         and os.path.splitext(f)[1].lower() in supported_exts
     ]
@@ -309,7 +335,7 @@ def get_model_response(
     prompt, max_new_tokens=512, temperature=0.85, top_p=0.8, use_rag=True
 ):
     history_messages = st.session_state.messages
-    if use_rag:
+    if use_rag and docs is not None and faiss_index is not None:
         search_query = prompt
         if len(st.session_state.messages) >= 2:
             recent_context = []
@@ -388,7 +414,9 @@ st.markdown("基于本地文档进行检索增强生成，支持 `.txt`, `.pdf`,
 with st.sidebar:
     st.header("⚙️ 设置")
     use_rag = st.checkbox(
-        "启用 RAG 检索增强", value=True, help="关闭则使用原始模型回答"
+        "启用 RAG 检索增强",
+        value=False,
+        help="开启后会加载 embedding 模型并构建向量库；首次较慢。无文档时可先关闭，直接对话。",
     )
     temperature = st.slider("Temperature", 0.1, 1.5, 0.85, 0.05)
     top_p = st.slider("Top-p", 0.1, 1.0, 0.8, 0.05)
@@ -433,7 +461,18 @@ with st.sidebar:
 
 
 model, tokenizer = load_model()
-docs, emb_model, faiss_index = initialize_rag(force_rebuild=False)
+
+docs, emb_model, faiss_index = None, None, None
+if use_rag:
+    with st.spinner(
+        "正在初始化 RAG（首次会下载 all-MiniLM-L6-v2，约 80MB，请耐心等待）..."
+    ):
+        docs, emb_model, faiss_index = initialize_rag(force_rebuild=False)
+    if docs is None or faiss_index is None:
+        st.warning(
+            f"RAG 未就绪：请在 `{DOCUMENT_FOLDER}` 放入 .txt/.pdf/.docx 后，"
+            "侧边栏点「重新构建」，或先关闭 RAG 直接聊天。"
+        )
 
 # 初始化聊天历史
 if "messages" not in st.session_state:

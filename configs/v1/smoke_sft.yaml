@@ -1,0 +1,27 @@
+stage: sft
+tokenizer_dir: tokenizer/v1
+output_dir: output/v1/smoke_sft
+init_ckpt: output/v1/smoke_pretrain/last.pt
+model:
+  hidden_size: 768
+  num_hidden_layers: 12
+  num_attention_heads: 8
+  num_key_value_heads: 2
+  vocab_size: 16384
+data:
+  path: dataset/sft_merged.jsonl
+  max_samples: 64
+train:
+  epochs: 1
+  batch_size: 2
+  max_seq_len: 256
+  learning_rate: 0.000005
+  weight_decay: 0.0
+  betas: [0.9, 0.95]
+  grad_clip: 1.0
+  accumulation_steps: 1
+  log_interval: 1
+  save_interval: 100
+  num_workers: 0
+  max_steps: 4
+  device: null

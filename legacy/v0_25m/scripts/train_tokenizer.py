@@ -20,15 +20,18 @@ setup_import_paths()
 random.seed(42)
 
 
-def train_tokenizer():
+def train_tokenizer(max_lines: int | None = None):
     # 读取JSONL文件并提取文本数据
-    def read_texts_from_jsonl(file_path):
+    def read_texts_from_jsonl(file_path, limit: int | None):
         with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
+            for i, line in enumerate(f):
+                if limit is not None and i >= limit:
+                    break
                 data = json.loads(line)
                 yield data["text"]
 
     data_path = repo_dataset("pretrain_wikipedia.jsonl")
+    print(f"训练分词器，语料: {data_path}" + (f"，最多 {max_lines} 条" if max_lines else ""))
 
     # 初始化tokenizer
     tokenizer = Tokenizer(models.BPE())
@@ -46,7 +49,7 @@ def train_tokenizer():
     )
 
     # 读取文本数据
-    texts = read_texts_from_jsonl(data_path)
+    texts = read_texts_from_jsonl(data_path, max_lines)
 
     # 训练tokenizer
     tokenizer.train_from_iterator(texts, trainer=trainer)
@@ -146,8 +149,20 @@ def eval_tokenizer():
 
 
 def main():
-    # train_tokenizer()
-    eval_tokenizer()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="训练 Legacy 25M BPE 分词器")
+    parser.add_argument(
+        "--max-lines",
+        type=int,
+        default=None,
+        help="仅用前 N 条样本（调试用）",
+    )
+    parser.add_argument("--skip-eval", action="store_true")
+    args = parser.parse_args()
+    train_tokenizer(max_lines=args.max_lines)
+    if not args.skip_eval:
+        eval_tokenizer()
 
 
 if __name__ == "__main__":

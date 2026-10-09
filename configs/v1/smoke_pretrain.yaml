@@ -1,0 +1,29 @@
+# 4070 冒烟：同一套 768×12 模型，少量数据、短序列、有限步数。
+stage: pretrain
+tokenizer_dir: tokenizer/v1
+output_dir: output/v1/smoke_pretrain
+init_ckpt: null
+model:
+  hidden_size: 768
+  num_hidden_layers: 12
+  num_attention_heads: 8
+  num_key_value_heads: 2
+  vocab_size: 16384
+  max_position_embeddings: 32768
+data:
+  path: dataset/pretrain_wikipedia.jsonl
+  max_samples: 2048
+train:
+  epochs: 1
+  batch_size: 2
+  max_seq_len: 256
+  learning_rate: 0.0003
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+  grad_clip: 1.0
+  accumulation_steps: 1
+  log_interval: 10
+  save_interval: 40
+  num_workers: 0
+  max_steps: 80
+  device: null

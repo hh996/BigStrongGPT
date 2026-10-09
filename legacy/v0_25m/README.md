@@ -16,6 +16,7 @@ python train_tokenizer.py   # 需先在脚本中启用 train_tokenizer()，数�
 cd ..\train
 python train_pretrain.py --data_path ../../dataset/pretrain_wikipedia.jsonl
 python train_full_sft.py --data_path ../../dataset/sft_merged.jsonl
+python train_dpo.py --data_path ../../dataset/dpo_merged.jsonl
 python train_lora.py --data_path ../../dataset/lora_medical.jsonl
 ```
 

@@ -1,3 +1,7 @@
-"""BigStrongGPT v1 包（重构入口，待实现）."""
+"""BigStrongGPT v1：150M 级 Dense（768×12，GQA 8/2，词表 16K）。"""
 
-__version__ = "0.0.0-dev"
+__version__ = "0.1.0"
+
+from .modeling import BigStrongConfig, BigStrongForCausalLLM
+
+__all__ = ["BigStrongConfig", "BigStrongForCausalLLM", "__version__"]

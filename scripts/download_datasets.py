@@ -365,6 +365,7 @@ def main():
     print("  cd legacy/v0_25m/train")
     print("  python train_pretrain.py")
     print("  python train_full_sft.py")
+    print("  python train_dpo.py")
     print("  python train_lora.py")
 
 

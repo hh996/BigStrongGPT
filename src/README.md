@@ -1,11 +1,16 @@
-# BigStrongGPT v1（开发中）
+# BigStrongGPT v1
 
-按 `docs/TRAINING_ROADMAP.md` 重构：
+768 维 × 12 层、GQA 8/2、词表 16384。Legacy 25M 在 `legacy/v0_25m/`。
 
-- 统一 Trainer + YAML 配置
-- 150~200M Dense → SFT → DPO
-- 阶段 2：MoE + MLA 简化版
+```powershell
+conda activate BigStrongGPT
+# 词表（已生成则可跳过）
+python scripts/train_tokenizer_v1.py
 
-**数据与文档**仍在仓库根目录 `dataset/`、`docs/`。
+$env:PYTHONPATH = "src;."
+python -m bigstrong.train --config configs/v1/smoke_pretrain.yaml
+python -m bigstrong.train --config configs/v1/smoke_pretrain.yaml --resume output/v1/smoke_pretrain/last.pt --max-steps 100
+python scripts/eval_v1.py
+```
 
-Legacy 25M 可运行代码在 `legacy/v0_25m/`。
+正式训练见 `docs/AUTODL.md`。配置：`configs/v1/pretrain.yaml`、`sft.yaml`、`dpo.yaml`。

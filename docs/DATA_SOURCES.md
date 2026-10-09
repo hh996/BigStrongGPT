@@ -73,7 +73,7 @@ huggingface-cli download Skywork/SkyPile-150B \
 | **Alpaca 中文** | [shibing624/alpaca-zh](https://huggingface.co/datasets/shibing624/alpaca-zh) | 2 万 | 小巧，适合调试 | ⭐⭐⭐ 调试 |
 | **COIG** | [BAAI/COIG](https://huggingface.co/datasets/BAAI/COIG) | 多文件 | 中文多任务，需下载 jsonl 后转换 | ⭐⭐ |
 | **MOSS SFT** | [fnlp/moss-002-sft-data](https://huggingface.co/datasets/fnlp/moss-002-sft-data) | 中等 | 中文多轮 | ⭐⭐ |
-| **7B 蒸馏生成** | 本地生成 | 1~5 万 | 4070 + Qwen2.5-7B，见 `scripts/generate_distill_data.py` | ⭐⭐⭐ 推荐 |
+| **7B 蒸馏生成** | 本地生成 | 1~5 万 | 4070 + Qwen2.5-7B，见 `scripts/generate_distill.py` | ⭐⭐⭐ 推荐 |
 
 ### 手动下载 Belle
 

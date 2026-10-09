@@ -179,9 +179,9 @@ epochs: 1
 
 ### Month 1 — 工程 + Dense
 
-- [ ] 重构代码：统一 Trainer + YAML config
-- [ ] 本地 4070：25M 跑通 Pretrain → SFT → DPO
-- [ ] 4070：部署量化 7B，编写蒸馏数据生成脚本
+- [x] 重构代码：统一 Trainer + YAML config（`src/bigstrong`，`configs/v1/`）
+- [x] 本地 4070：25M 跑通 Pretrain → SFT → DPO
+- [x] 4070：蒸馏脚本 `scripts/generate_distill.py`（全量生成在上云前或与 Pretrain 并行跑）
 - [ ] AutoDL：150~200M 正式 Pretrain（1.5~2B tokens）
 - [ ] 合并 7B 生成数据，做 SFT
 - [ ] DPO 对齐
